@@ -35,6 +35,9 @@ pre{background:#0b0d11;border:1px solid var(--line);border-radius:12px;padding:1
 .kv b{font-weight:600}
 details{margin-top:12px}summary{cursor:pointer;color:var(--acc);font-size:14px}
 .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;background:#252a34;color:var(--dim);margin-left:6px}
+.rfitem{display:flex;align-items:flex-start;gap:9px;font-size:14px;color:var(--fg);margin:9px 0;overflow-wrap:anywhere}
+.rfitem input{width:auto;flex:0 0 auto;margin-top:4px;accent-color:var(--acc)}
+.rfitem span{flex:1 1 auto;line-height:1.45}
 </style>
 </head>
 <body>
@@ -89,7 +92,7 @@ details{margin-top:12px}summary{cursor:pointer;color:var(--acc);font-size:14px}
   </div>
   <div class="row">
     <div><label>深蹲 1RM (kg)</label><input type="number" id="squat1RMKg" inputmode="decimal" placeholder="110"></div>
-    <div><label>晨起疼痛 NRS</label><input type="number" id="painNrs" inputmode="decimal" placeholder="0"></div>
+    <div><label>踝背屈 (°)</label><input type="number" id="ankleDfDeg" inputmode="decimal" placeholder="38"></div>
   </div>
   <label>站立摸高 (cm)</label><input type="number" id="standingReachCm" inputmode="decimal" placeholder="235">
   <div class="row">
@@ -109,16 +112,47 @@ details{margin-top:12px}summary{cursor:pointer;color:var(--acc);font-size:14px}
     <div><label>5-10-5 (秒)</label><input type="number" id="proAgilityS" inputmode="decimal" step="0.01" placeholder="4.80"></div>
     <div><label>505 变向 (秒)</label><input type="number" id="t505S" inputmode="decimal" step="0.01" placeholder="2.52"></div>
   </div>
+  <div class="hint">踝背屈测量：靠墙跪姿，保持脚跟不离地向前顶膝，量脚尖到墙的距离换算角度。
+  有前瞻研究报道 &lt;36.5° 的青少年精英篮球运动员髌腱病风险显著升高。</div>
 </div>
 
-<h2>③ 有氧数据</h2>
+<h2>③ 疼痛评估</h2>
+<div class="card">
+  <label>疼痛部位</label>
+  <select id="painSite"></select>
+  <div class="row">
+    <div><label>静息 NRS (0-10)</label><input type="number" id="painRest" inputmode="decimal" placeholder="0"></div>
+    <div><label>活动中 NRS (0-10)</label><input type="number" id="painActivity" inputmode="decimal" placeholder="0"></div>
+  </div>
+  <div class="row">
+    <div><label>次日晨起 NRS (0-10)</label><input type="number" id="painNextMorning" inputmode="decimal" placeholder="0"></div>
+    <div><label>症状持续（周）</label><input type="number" id="painWeeks" inputmode="decimal" placeholder="3"></div>
+  </div>
+  <label>时间模式</label>
+  <select id="painPattern"></select>
+  <label>红旗征象（勾选任何一项 → 停止评估并线下就诊）</label>
+  <div id="rfbox"></div>
+  <div class="hint">判定逻辑为<b>谨慎的启发式</b>，不是诊断标准：活动中 ≤3 且次晨回到基线 → 可正常训练；
+  4–5 或次晨升高 → 减量并替换挑衅负荷；≥6 或次晨持续升高或进行性加重 → 停挑衅负荷做相对休息。
+  阈值来自疼痛监测模型，但该模型在髌腱病人群中<b>从未被正式 RCT 检验</b>。</div>
+</div>
+
+<h2>④ 耐力数据</h2>
 <div class="card">
   <div class="row">
-    <div><label>3000 m 用时 (分:秒)</label><input type="text" id="run3000" placeholder="13:30" inputmode="numeric"></div>
+    <div><label>Yo-Yo IR1 (m)</label><input type="number" id="yoyoIr1M" inputmode="decimal" placeholder="1400"></div>
     <div><label>12 分钟跑 (m)</label><input type="number" id="run12minM" inputmode="decimal" placeholder="2600"></div>
   </div>
-  <label>静息心率 (bpm)</label><input type="number" id="restingHr" inputmode="decimal" placeholder="62">
-  <div class="hint">有氧与力量/爆发力同期训练会互相干扰。填了这项，方案里会自动给出排布建议。</div>
+  <div class="row">
+    <div><label>3000 m 用时 (分:秒)</label><input type="text" id="run3000" placeholder="13:30" inputmode="numeric"></div>
+    <div><label>30 m 冲刺 (秒)</label><input type="number" id="sprint30mS" inputmode="decimal" step="0.01" placeholder="4.40"></div>
+  </div>
+  <div class="row">
+    <div><label>静息心率 (bpm)</label><input type="number" id="restingHr" inputmode="decimal" placeholder="62"></div>
+    <div><label>每周可训练天数</label><input type="number" id="trainingDays" inputmode="numeric" placeholder="5"></div>
+  </div>
+  <div class="hint">同期训练的干扰效应<b>比早期认为的小得多</b>（最大力量 −0.06 不显著、爆发力 −0.28），
+  且主要出现在训练水平高的人身上。结论：有氧应<b>纳入</b>而非限制，但优先级最低、走间歇形式、不与力量同段。</div>
 </div>
 
 <button id="gen">生成评估与训练方案</button>
@@ -127,11 +161,25 @@ details{margin-top:12px}summary{cursor:pointer;color:var(--acc);font-size:14px}
 
 <script type="module">
 import { trackFrames, analyzeWithAutoFps } from './core.js';
-import { computeDerived, buildFlags, rankLimiters, prescribe, renderMarkdown } from './plan.js';
+import { computeDerived, buildFlags, rankLimiters, prescribe, renderMarkdown,
+         assessPain, buildEndurancePlan, PAIN_SITES, PAIN_PATTERNS, RED_FLAGS } from './plan.js';
 import { openVideo, closeVideo, framesFromVideo, probeFps } from './video.js';
 
 const $ = (id) => document.getElementById(id);
 const val = (id) => { const v = $(id).value.trim(); return v === '' ? null : v; };
+
+// 下拉与红旗清单从 plan.js 的常量生成，避免两处维护导致不一致
+for (const s of PAIN_SITES) {
+  $('painSite').insertAdjacentHTML('beforeend', `<option value="${s.id}">${s.label}</option>`);
+}
+$('painPattern').insertAdjacentHTML('beforeend', '<option value="">未填</option>');
+for (const s of PAIN_PATTERNS) {
+  $('painPattern').insertAdjacentHTML('beforeend', `<option value="${s.id}">${s.label}</option>`);
+}
+for (const s of RED_FLAGS) {
+  $('rfbox').insertAdjacentHTML('beforeend',
+    `<label class="rfitem"><input type="checkbox" class="rf" value="${s.id}"><span>${s.label}</span></label>`);
+}
 
 let lastVideoResult = null;
 
@@ -248,7 +296,14 @@ $('gen').onclick = () => {
     tripleHopLCm: val('tripleHopLCm'), tripleHopRCm: val('tripleHopRCm'),
     standingTripleJumpCm: val('standingTripleJumpCm'),
     rsi: val('rsi'), proAgilityS: val('proAgilityS'), t505S: val('t505S'),
-    painNrs: val('painNrs'), run12minM: val('run12minM'), restingHr: val('restingHr'),
+    run12minM: val('run12minM'), restingHr: val('restingHr'),
+    yoyoIr1M: val('yoyoIr1M'), sprint30mS: val('sprint30mS'),
+    ankleDfDeg: val('ankleDfDeg'), trainingDays: val('trainingDays'),
+    painSite: $('painSite').value,
+    painPattern: $('painPattern').value || null,
+    painWeeks: val('painWeeks'), painRest: val('painRest'),
+    painActivity: val('painActivity'), painNextMorning: val('painNextMorning'),
+    redFlags: Array.from(document.querySelectorAll('.rf:checked')).map((x) => x.value),
   };
   const t = val('run3000');
   if (t) {
@@ -257,6 +312,8 @@ $('gen').onclick = () => {
   }
 
   const { d, notes, warnings } = computeDerived(p);
+  const pain = assessPain(d);
+  const endurance = buildEndurancePlan(d);
   const flags = buildFlags(d, 320);
   for (const w of warnings) flags.unshift({ level: 'AMBER', text: '数据口径可疑 —— ' + w });
 
@@ -265,12 +322,12 @@ $('gen').onclick = () => {
     flags.push({ level: 'INFO', text: `身高 ${heightCm} cm 已记录；站立摸高与助跑摸高才是缺口计算的依据。` });
   }
 
-  const limiters = rankLimiters(d);
-  const plan = prescribe(d, 'dunk');
-  let md = renderMarkdown(d, flags, limiters, plan, {});
+  const limiters = rankLimiters(d, pain);
+  const plan = prescribe(d, pain, endurance, 'dunk');
+  let md = renderMarkdown(d, flags, limiters, plan, pain, endurance, {});
   if (notes.length) {
-    md = md.replace('## 2. 判读与标记',
-      '**数据说明**\n\n' + notes.map(n => '- ' + n).join('\n') + '\n\n## 2. 判读与标记');
+    md = md.replace('## 3. 判读与标记',
+      '**数据说明**\n\n' + notes.map(n => '- ' + n).join('\n') + '\n\n## 3. 判读与标记');
   }
 
   const lines = md.split('\n');
