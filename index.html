@@ -331,17 +331,28 @@ $('gen').onclick = () => {
   }
 
   const lines = md.split('\n');
+  // 行内格式：**加粗** —— 之前直接把星号显示出来了
+  const inline = (s) => s
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
   const html = lines.map(l => {
-    if (l.startsWith('# ')) return `<h2>${l.slice(2)}</h2>`;
-    if (l.startsWith('## ')) return `<h3 style="font-size:14px;color:var(--acc);margin:18px 0 8px">${l.slice(3)}</h3>`;
-    if (l.startsWith('- ')) {
-      const cls = l.includes('🔴') ? 'err' : (l.includes('🟠') ? '' : '');
-      return `<div style="font-size:14px;margin:5px 0">${l.slice(2)}</div>`;
+    if (l.startsWith('# ')) return `<h2>${inline(l.slice(2))}</h2>`;
+    if (l.startsWith('## ')) return `<h3 style="font-size:14px;color:var(--acc);margin:18px 0 8px">${inline(l.slice(3))}</h3>`;
+    if (l.startsWith('#### ')) {
+      return `<div style="font-weight:700;margin:16px 0 8px;padding-left:8px;border-left:3px solid var(--acc)">${inline(l.slice(5))}</div>`;
     }
-    if (l.startsWith('| ')) return `<div style="font-family:ui-monospace,monospace;font-size:12px">${l}</div>`;
-    if (l.startsWith('> ')) return `<div class="hint">${l.slice(2)}</div>`;
+    if (l.startsWith('### ')) {
+      return `<h4 style="font-size:13px;color:var(--dim);margin:14px 0 6px;font-weight:600">${inline(l.slice(4))}</h4>`;
+    }
+    if (l.startsWith('- ')) {
+      const isRed = l.includes('🔴');
+      const style = isRed ? ' style="color:#ffb4ae"' : '';
+      return `<div style="font-size:14px;margin:6px 0;line-height:1.55"${style}>${inline(l.slice(2))}</div>`;
+    }
+    if (l.startsWith('| ')) return `<div style="font-family:ui-monospace,monospace;font-size:12px">${inline(l)}</div>`;
+    if (l.startsWith('> ')) return `<div class="hint">${inline(l.slice(2))}</div>`;
     if (l.trim() === '---') return '<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">';
-    return l ? `<div style="font-size:14px;margin:5px 0">${l}</div>` : '';
+    return l ? `<div style="font-size:14px;margin:5px 0">${inline(l)}</div>` : '';
   }).join('');
 
   $('out').innerHTML = `<div class="card">${html}</div>`;
