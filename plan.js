@@ -427,6 +427,84 @@ export function rankLimiters(d, pain) {
 }
 
 /* ------------------------------------------------------------------ */
+/* 动作库                                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 动作库：每个动作自带组数、次数、强度与组间休息。
+ * 每周排布直接引用这里，保证「每日清单」和「核心训练块」不会各说一套。
+ * 只要填了深蹲 1RM，深蹲家族就会直接换算成公斤数——用户要的就是"重量"。
+ */
+function exerciseLibrary(d, { red, yellow }) {
+  const oneRM = d.squat1RMKg;
+  const r25 = (x) => Math.round(x / 2.5) * 2.5;   // 健身房最小配重片 2.5 kg
+  const squatLoad = (lo, hi) => oneRM
+    ? `${Math.round(lo * 100)}–${Math.round(hi * 100)}% 1RM（${r25(oneRM * lo)}–${r25(oneRM * hi)} kg）`
+    : `${Math.round(lo * 100)}–${Math.round(hi * 100)}% 1RM（填上深蹲 1RM 后会直接显示公斤）`;
+  const it = (name, dose, load, rest) => ({ name, dose, load, rest });
+
+  const E = {
+    /* 通用 */
+    warmup: it('热身', '10–12 分钟', '低强度有氧 5 分钟 → 动态拉伸 → 2 组递增专项准备', ''),
+    coreBasic: it('核心：死虫 / 平板支撑 / 悬垂举腿', '3 组 × 10–12 次', '自重', '组间 60 秒'),
+    liss: it('低强度持续有氧（LISS）', '20–30 分钟', '心率约 60–70% 最大心率（能正常说话）', '放在力量之后或另起一天'),
+    rest: it('完全休息', '—', '可做轻度活动：散步、拉伸', '保证睡眠 ≥7 小时'),
+    logPain: it('记录', '每天', '静息 / 活动中 / 次日晨起 三个 NRS + 静息心率', '次晨回到基线后再按 10–20% 阶梯恢复'),
+
+    /* 力量 */
+    complexSquat: it('深蹲（复合训练 · 重负荷组）', '3–4 次 × 2–4 组', squatLoad(0.85, 0.90),
+      '做完立刻休息 4–6 分钟，再接下面的爆发组'),
+    complexJump: it('CMJ 或箱跳（复合训练 · 爆发组）', '3–5 次 × 2–4 组', '自重，追求最大高度与最短触地',
+      '组间 2 分钟；与上面的重负荷组配对完成'),
+    rdl: it('罗马尼亚硬拉', '3 组 × 6 次', 'RPE 7（约 70–75% 1RM）', '组间 2 分钟'),
+    singleLegSquat: it('单腿蹲（箱式）', '2–3 组 × 6–8 次/侧', '自重起步；能标准完成 3×8 后加负重', '组间 90 秒'),
+    singleLegRdl: it('单腿罗马尼亚硬拉', '2–3 组 × 6–8 次/侧', 'RPE 7（哑铃或壶铃）', '组间 90 秒'),
+
+    /* 上肢 */
+    upperPush: it('卧推 / 哑铃推举', '3 组 × 6–8 次', 'RPE 7（约 70% 1RM）', '组间 2 分钟'),
+    upperPull: it('引体向上 / 划船', '3 组 × 6–10 次', 'RPE 7–8；引体做不了就用弹力带辅助', '组间 2 分钟'),
+
+    /* 敏捷与冲刺 */
+    agility: it('敏捷变向：5-10-5 与 505', '5-10-5 × 4 组；505 × 4 组/侧', '全力', '组间 2 分钟；光电或秒表计时并记录'),
+    sit: it('冲刺间歇（SIT）', '6–10 × 20–30 m', '全力', '走回完全恢复（60–90 秒）'),
+    shortSprint: it('短冲刺', '6–8 × ≤10 秒', '全力', '组间 60–90 秒'),
+
+    /* 增强式 */
+    plyoLow: it('低量增强式：箱跳 + 连续跳', '箱跳 4 组 × 5 次、连续跳 4 组 × 5 次',
+      '箱高按蹲跳高度定：bounce 用 75–100% SJH，countermovement 用 100–125% SJH', '组间 90 秒；合计 60–80 次落地'),
+    landingControl: it('单腿落地控制', '3 组 × 5 次/侧', '从 20 cm 箱迈下，稳定站住 3 秒', '组间 60 秒'),
+    singleHop: it('台阶单腿跳 / 单腿连续跳', '3 组 × 5 次/侧', '自重，低台阶起步', '组间 90 秒'),
+    approachTech: it('助跑起跳技术', '3–5 步助跑 × 8–10 次', '全强度（组间充分休息，不追求数量）',
+      '组间 1–2 分钟；侧面慢动作录像复盘'),
+
+    /* 有氧 */
+    ssg: it('小场对抗（SSG）', '3–4 组 × 4 分钟', '3v3 或 4v4 全场来回，比赛强度', '组间 2 分钟'),
+    hiit: it('高强度间歇（HIIT）', '4 组 × 4 分钟', '约 90% 最大心率', '组间 3 分钟慢跑；放在当天最后'),
+
+    /* 疼痛档专用 */
+    hsr: it('深蹲 / 腿举 / 单腿蹲（肌腱方案 · 慢速重负荷）', '4 组 × 8–15 次',
+      '第 1 周 15RM → 12RM → 10RM → 8RM → 第 9–12 周 6RM；离心 3 秒 + 向心 3 秒',
+      '组间 2–3 分钟；每周 3 次，共 12 周'),
+    landingControlLight: it('低挑衅落地控制', '3 组 × 5 次/侧', '从 10–20 cm 台阶迈下，稳定站住 3 秒',
+      '组间 60 秒；只在疼痛 ≤2/10 时做'),
+  };
+
+  // 黄档：容量下调、去掉落地反跳与最大强度助跑
+  if (yellow) {
+    E.plyoLow = it('低量增强式（黄档：去掉落地反跳与最大强度起跳）',
+      '原地跳 4 组 × 5 次、跳绳 3 组 × 30 秒', '自重，落地要轻、要静',
+      '组间 90 秒；疼痛超过 3/10 立即停止');
+    E.approachTech = it('助跑起跳（黄档：降到约 70% 强度）', '3 步助跑 × 6 次', '不摸最高点，只走节奏',
+      '组间 90 秒');
+    E.sit = it('冲刺间歇（黄档：减组数、降强度）', '4–6 × 20 m', '约 80% 强度，不做全力', '走回恢复 90 秒');
+    E.complexSquat = it('深蹲（黄档：去掉复合训练配对）', '3 组 × 5 次 @ RPE 7', squatLoad(0.75, 0.80),
+      '组间 3 分钟；不再接爆发组');
+    delete E.complexJump;
+  }
+  return E;
+}
+
+/* ------------------------------------------------------------------ */
 /* 主处方                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -510,15 +588,32 @@ export function prescribe(d, pain, endurance, goal = 'dunk') {
   });
 
   // ---- 每周排布 ----
+  // 每一天都必须是「能直接拿去健身房执行」的清单：每个动作自带组数、次数、重量、组间休息。
+  // 只写动作名（如"上肢 + 核心"）是不可执行的，等于没给。
   const days = Math.max(3, Math.min(7, d.trainingDays || 5));
+  const E = exerciseLibrary(d, { red, yellow });
   const W = [];
-  W.push({ day: 'D1', items: ['复合训练（重蹲 → 休息 4–6 min → CMJ/箱跳）', '力量：深蹲 3–5×3–5', '低量增强式 60–80 次落地'] });
-  W.push({ day: 'D2', items: ['敏捷：5-10-5 / 505 / 变向', '冲刺间歇 SIT 6–10×20–30 m', '单侧力量 2–3×6–8/侧'] });
-  W.push({ day: 'D3', items: ['上肢 + 核心', '有氧：20–30 min 低强度（LISS，骑车或慢跑）'] });
-  W.push({ day: 'D4', items: ['篮球实战 / 小场对抗 SSG（同时满足 RSA 与间歇有氧）', '短冲刺 ≤10 s × 6–8'] });
-  W.push({ day: 'D5', items: ['低量增强式 + 助跑技术 8–10 次', 'HIIT 4×4 min（放在最后，不与力量同段）'] });
-  if (days >= 6) W.push({ day: 'D6', items: ['单侧训练 + 落地控制', '可选：20 min 低强度有氧'] });
-  if (days >= 7) W.push({ day: 'D7', items: ['完全休息 或 轻度活动', '记录晨起疼痛与静息心率'] });
+  // 黄档会删掉某些动作（如复合训练的爆发组），用 filter(Boolean) 兜住，避免渲染出 undefined
+  const addDay = (label, theme, ...items) => W.push({ day: label, theme, items: items.filter(Boolean) });
+
+  if (red) {
+    // 红档：停挑衅负荷，做相对休息。仍保留上肢/核心/无痛有氧，不是完全停训。
+    addDay('D1', '慢速重负荷（肌腱方案）', E.warmup, E.hsr, E.coreBasic);
+    addDay('D2', '上肢 + 核心（无痛区）', E.warmup, E.upperPush, E.upperPull, E.coreBasic);
+    addDay('D3', '相对休息 / 无痛有氧', E.liss, E.rest);
+    addDay('D4', '慢速重负荷（肌腱方案）', E.warmup, E.hsr, E.landingControlLight);
+    addDay('D5', '上肢 + 核心 + 记录', E.warmup, E.upperPush, E.upperPull, E.logPain);
+    if (days >= 6) addDay('D6', '无痛有氧', E.liss);
+    if (days >= 7) addDay('D7', '完全休息', E.rest);
+  } else {
+    addDay('D1', '下肢力量 + 复合训练', E.warmup, E.complexSquat, E.complexJump, E.rdl, E.coreBasic);
+    addDay('D2', '敏捷 + 冲刺间歇 + 单侧力量', E.warmup, E.agility, E.sit, E.singleLegSquat, E.singleLegRdl);
+    addDay('D3', '上肢 + 核心 + 低强度有氧', E.warmup, E.upperPush, E.upperPull, E.coreBasic, E.liss);
+    addDay('D4', '实战 / 小场对抗 + 短冲刺', E.warmup, E.ssg, E.shortSprint);
+    addDay('D5', '低量增强式 + 助跑技术 + HIIT', E.warmup, E.plyoLow, E.approachTech, E.hiit);
+    if (days >= 6) addDay('D6', '单侧训练 + 落地控制', E.warmup, E.landingControl, E.singleHop);
+    if (days >= 7) addDay('D7', '完全休息', E.rest, E.logPain);
+  }
 
   plan.weekly = W;
   plan.focus = red ? '先解决疼痛耐受性（暂停高强度跳跃）'
@@ -666,11 +761,18 @@ export function renderMarkdown(d, flags, limiters, plan, pain, endurance, profil
       if (b.caution) { L.push(`> ${b.caution}`); L.push(''); }
     }
 
-    L.push('### 5.2 每周排布', '');
-    L.push('| 日 | 内容 |');
-    L.push('|---|---|');
-    for (const w of plan.weekly) L.push(`| ${w.day} | ${w.items.join('<br>')} |`);
+    L.push('### 5.2 每日训练明细', '');
+    L.push('每个动作都带组数、次数、重量与组间休息，可以单独打印某一天带去训练。');
     L.push('');
+    for (const w of plan.weekly) {
+      L.push(`#### ${w.day} · ${w.theme}`);
+      L.push('');
+      for (const i of w.items) {
+        const bits = [i.dose, i.load, i.rest].filter(Boolean).join('　｜　');
+        L.push(`- **${i.name}** —— ${bits}`);
+      }
+      L.push('');
+    }
     if (plan.note) L.push(`> ${plan.note}`, '');
     L.push(`> ${plan.deloadNote}`, '');
     L.push(`- **进阶条件**：${plan.progression}`);
