@@ -1,6 +1,6 @@
 /* sports-rehab 离线缓存
    改代码后请把 CACHE 版本号 +1，否则手机会一直用旧缓存。 */
-const CACHE = 'sports-rehab-v1';
+const CACHE = 'sports-rehab-v2';
 const ASSETS = [
   './', './index.html', './core.js', './plan.js', './video.js',
   './manifest.webmanifest', './icon.svg',
