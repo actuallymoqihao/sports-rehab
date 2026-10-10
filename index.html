@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon.svg">
+<title>弹跳与敏捷 · 评估与方案</title>
+<style>
+:root{--bg:#0f1115;--card:#1a1d24;--line:#2a2f3a;--fg:#e8eaed;--dim:#9aa3b2;--acc:#4da3ff;--ok:#38d39f;--warn:#f0a33c;--bad:#ff5f56}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 80px}
+h1{font-size:20px;margin:0 0 4px}
+h2{font-size:15px;color:var(--acc);margin:22px 0 10px;letter-spacing:.5px}
+.sub{color:var(--dim);font-size:13px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+label{display:block;font-size:13px;color:var(--dim);margin:12px 0 5px}
+input,select{width:100%;background:#0b0d11;border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:12px;font-size:16px;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:var(--acc)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{width:100%;background:var(--acc);color:#04121f;border:0;border-radius:12px;padding:15px;font-size:16px;font-weight:700;font-family:inherit;margin-top:14px}
+button.sec{background:#252a34;color:var(--fg)}
+button:disabled{opacity:.45}
+.hint{font-size:12px;color:var(--dim);margin-top:6px;line-height:1.5}
+.bar{height:8px;background:#0b0d11;border-radius:99px;overflow:hidden;margin-top:12px}
+.bar>i{display:block;height:100%;background:var(--acc);width:0;transition:width .15s}
+pre{background:#0b0d11;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:13px;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;font-family:ui-monospace,Menlo,monospace}
+.msg{font-size:14px;padding:10px 12px;border-radius:10px;margin-top:12px}
+.msg.err{background:#3a1a18;color:#ffb4ae;border:1px solid #5c2a26}
+.msg.ok{background:#12302a;color:#9df0d3;border:1px solid #1f5346}
+.kv{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.kv:last-child{border:0}
+.kv b{font-weight:600}
+details{margin-top:12px}summary{cursor:pointer;color:var(--acc);font-size:14px}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;background:#252a34;color:var(--dim);margin-left:6px}
+</style>
+</head>
+<body>
+
+<h1>弹跳与敏捷 · 评估与方案</h1>
+<div class="sub">运动康复评估流程 · 结果不是医学诊断</div>
+
+<h2>① 视频测数据（可选，先做这个）</h2>
+<div class="card">
+  <label>选择视频（用系统相机拍的 240 fps 慢动作）</label>
+  <input type="file" id="file" accept="video/*">
+  <div class="row">
+    <div>
+      <label>视频帧率 fps</label>
+      <select id="fps">
+        <option value="240" selected>240（iPhone 慢动作）</option>
+        <option value="120">120</option>
+        <option value="60">60（不能测 RSI）</option>
+        <option value="30">30</option>
+      </select>
+    </div>
+    <div>
+      <label>动作类型</label>
+      <select id="mode">
+        <option value="cmj">CMJ 原地起跳</option>
+        <option value="sj">SJ 下蹲跳</option>
+        <option value="dropjump">落地反跳（算 RSI）</option>
+      </select>
+    </div>
+  </div>
+  <label>两个标定标记的真实间距 (cm)</label>
+  <input type="number" id="refcm" value="100" inputmode="decimal">
+  <div class="hint">标记配色：墙上两个<b>青色</b>（竖直摆放）、髋部<b>黄色</b>、鞋部<b>绿色</b>。<br>
+  浏览器拿不到摄像头慢动作，所以必须用系统相机拍好再选文件。<br>
+  <b>帧率填错也不要紧</b>：程序会用跳跃的腾空时间反推真实帧率并自动校正
+  （物理上腾空时间由重力决定，骗不了）。下面的「检测真实帧率」只是交叉核对。<br>
+  <b>第一次用请先拿样片试</b>：<code>samples/sample-cmj-true-45cm.mp4</code>（真值 45.0 cm）——
+  能算出 ≈44.8 cm 就说明链路正常。</div>
+  <button id="probe" class="sec">检测真实帧率</button>
+  <div id="pmsg"></div>
+  <button id="run">开始分析视频</button>
+  <div class="bar" id="barwrap" style="display:none"><i id="bar"></i></div>
+  <div id="vmsg"></div>
+  <div id="vres"></div>
+</div>
+
+<h2>② 身体资料与实测数据</h2>
+<div class="card">
+  <div class="row">
+    <div><label>身高 (cm)</label><input type="number" id="heightCm" inputmode="decimal" placeholder="182"></div>
+    <div><label>体重 (kg)</label><input type="number" id="weightKg" inputmode="decimal" placeholder="75"></div>
+  </div>
+  <div class="row">
+    <div><label>深蹲 1RM (kg)</label><input type="number" id="squat1RMKg" inputmode="decimal" placeholder="110"></div>
+    <div><label>晨起疼痛 NRS</label><input type="number" id="painNrs" inputmode="decimal" placeholder="0"></div>
+  </div>
+  <label>站立摸高 (cm)</label><input type="number" id="standingReachCm" inputmode="decimal" placeholder="235">
+  <div class="row">
+    <div><label>CMJ 高度 (cm)</label><input type="number" id="cmjCm" inputmode="decimal" placeholder="60"></div>
+    <div><label>SJ 高度 (cm)</label><input type="number" id="sjCm" inputmode="decimal" placeholder="53"></div>
+  </div>
+  <label>助跑摸高 (cm，绝对值)</label><input type="number" id="approachReachCm" inputmode="decimal" placeholder="305">
+  <div class="row">
+    <div><label>单腿三级跳 左 (cm)</label><input type="number" id="tripleHopLCm" inputmode="decimal" placeholder="620"></div>
+    <div><label>单腿三级跳 右 (cm)</label><input type="number" id="tripleHopRCm" inputmode="decimal" placeholder="590"></div>
+  </div>
+  <div class="row">
+    <div><label>立定三级跳 (cm)</label><input type="number" id="standingTripleJumpCm" inputmode="decimal" placeholder="720"></div>
+    <div><label>RSI</label><input type="number" id="rsi" inputmode="decimal" step="0.01" placeholder="1.20"></div>
+  </div>
+  <div class="row">
+    <div><label>5-10-5 (秒)</label><input type="number" id="proAgilityS" inputmode="decimal" step="0.01" placeholder="4.80"></div>
+    <div><label>505 变向 (秒)</label><input type="number" id="t505S" inputmode="decimal" step="0.01" placeholder="2.52"></div>
+  </div>
+</div>
+
+<h2>③ 有氧数据</h2>
+<div class="card">
+  <div class="row">
+    <div><label>3000 m 用时 (分:秒)</label><input type="text" id="run3000" placeholder="13:30" inputmode="numeric"></div>
+    <div><label>12 分钟跑 (m)</label><input type="number" id="run12minM" inputmode="decimal" placeholder="2600"></div>
+  </div>
+  <label>静息心率 (bpm)</label><input type="number" id="restingHr" inputmode="decimal" placeholder="62">
+  <div class="hint">有氧与力量/爆发力同期训练会互相干扰。填了这项，方案里会自动给出排布建议。</div>
+</div>
+
+<button id="gen">生成评估与训练方案</button>
+<button id="copy" class="sec" style="display:none">复制方案</button>
+<div id="out"></div>
+
+<script type="module">
+import { trackFrames, analyzeWithAutoFps } from './core.js';
+import { computeDerived, buildFlags, rankLimiters, prescribe, renderMarkdown } from './plan.js';
+import { openVideo, closeVideo, framesFromVideo, probeFps } from './video.js';
+
+const $ = (id) => document.getElementById(id);
+const val = (id) => { const v = $(id).value.trim(); return v === '' ? null : v; };
+
+let lastVideoResult = null;
+
+// ---------- 探测真实帧率（iPhone 转码风险的主要防线）----------
+$('probe').onclick = async () => {
+  const f = $('file').files[0];
+  const pm = $('pmsg');
+  pm.innerHTML = '';
+  if (!f) { pm.innerHTML = '<div class="msg err">先选一个视频文件。</div>'; return; }
+  const chosen = Number($('fps').value);
+  $('probe').disabled = true;
+  pm.innerHTML = '<div class="msg ok">正在播放并采样帧时间戳…</div>';
+  let handle = null;
+  try {
+    handle = await openVideo(f);
+    const r = await probeFps(handle);
+    if (!r.ok) {
+      pm.innerHTML = `<div class="msg err">探测失败：${r.reason}。请手动确认帧率——iPhone 到「照片 → 该视频 → 上滑信息」看是否写着 240 fps。</div>`;
+    } else {
+      const match = r.fps === chosen;
+      pm.innerHTML = match
+        ? `<div class="msg ok">实测帧率 ≈ <b>${r.fps} fps</b>（原始 ${r.rawFps}，采样 ${r.samples} 帧），与所选一致，可以开始分析。</div>`
+        : `<div class="msg err">⚠️ 实测帧率 ≈ <b>${r.fps} fps</b>（原始 ${r.rawFps}，采样 ${r.samples} 帧），
+           但上面选的是 ${chosen} fps。<b>请把帧率改成 ${r.fps} 再分析</b>，否则时间尺度会错。
+           ${r.note ? '<br>' + r.note : ''}</div>`;
+      if (!match) $('fps').value = String(r.fps);
+    }
+  } catch (e) {
+    pm.innerHTML = `<div class="msg err">${e.message || e}</div>`;
+  } finally {
+    $('probe').disabled = false;
+    if (handle) closeVideo(handle);
+  }
+};
+
+// ---------- 视频分析 ----------
+$('run').onclick = async () => {
+  const f = $('file').files[0];
+  const msg = $('vmsg'), res = $('vres'), bar = $('bar'), w = $('barwrap');
+  res.innerHTML = ''; msg.innerHTML = '';
+  if (!f) { msg.innerHTML = '<div class="msg err">先选一个视频文件。</div>'; return; }
+
+  const fps = Number($('fps').value);
+  const mode = $('mode').value;
+  const refCm = Number($('refcm').value) || 100;
+  $('run').disabled = true;
+  w.style.display = 'block'; bar.style.width = '0%';
+
+  let handle = null;
+  try {
+    msg.innerHTML = '<div class="msg ok">正在打开视频…</div>';
+    handle = await openVideo(f);
+
+    const specs = { cyan: 2, yellow: 1, green: 1 };
+    const gen = framesFromVideo(handle, {
+      fps, targetWidth: 540,
+      onProgress: (i, total) => { bar.style.width = (i / total * 100).toFixed(1) + '%'; },
+    });
+    msg.innerHTML = '<div class="msg ok">正在逐帧分析（手机上约 30–60 秒，请别切走）…</div>';
+    const { tracks, frames } = await trackFrames(gen, specs, { morphology: 'none' });
+
+    bar.style.width = '100%';
+    const t0 = performance.now();
+    const r = analyzeWithAutoFps(tracks, {
+      fps, calibColor: 'cyan', hipColor: 'yellow', shoeColor: 'green', mode, refCm, quietS: 1.2,
+    });
+    r.frames = frames; r.elapsedMs = Math.round(performance.now() - t0);
+    lastVideoResult = r;
+
+    const out = [];
+    out.push(`<div class="kv"><span>读取帧数</span><b>${frames}</b></div>`);
+    if (r.fpsEffective != null) {
+      out.push(`<div class="kv"><span>由重力反推的真实帧率</span><b>${r.fpsEffective} fps</b></div>`);
+      if (r.fpsUsed != null && r.fpsUsed !== fps) {
+        out.push(`<div class="kv"><span>实际采用帧率</span><b>${r.fpsUsed} fps（已自动校正）</b></div>`);
+      }
+    }
+    out.push(`<div class="kv"><span>跳跃高度</span><b>${r.jumpHeightCm ?? '—'} cm</b></div>`);
+    if (r.contactTimeMs != null) out.push(`<div class="kv"><span>触地时间</span><b>${r.contactTimeMs} ms</b></div>`);
+    if (r.rsi != null) out.push(`<div class="kv"><span>RSI</span><b>${r.rsi}</b></div>`);
+    out.push(`<div class="kv"><span>空间分辨率</span><b>${r.spaceResolutionCm?.toFixed(3) ?? '—'} cm/px</b></div>`);
+    out.push(`<div class="kv"><span>识别率 标定/髋/鞋</span><b>${r.calibFoundPct.toFixed(0)}% / ${r.hipFoundPct.toFixed(0)}% / ${(r.shoeFoundPct ?? 0).toFixed(0)}%</b></div>`);
+    if (r.rsiNote) out.push(`<div class="hint">${r.rsiNote}</div>`);
+    for (const wn of r.warnings) out.push(`<div class="msg err">⚠️ ${wn}</div>`);
+    res.innerHTML = out.join('');
+
+    if (r.jumpHeightCm != null) {
+      const btn = document.createElement('button');
+      btn.textContent = '把结果填入下面的表单';
+      btn.onclick = () => {
+        if (mode === 'cmj') $('cmjCm').value = r.jumpHeightCm;
+        else if (mode === 'sj') $('sjCm').value = r.jumpHeightCm;
+        if (r.rsi != null) $('rsi').value = r.rsi;
+        btn.textContent = '已填入 ✓';
+        window.scrollTo({ top: document.body.scrollHeight * 0.35, behavior: 'smooth' });
+      };
+      res.appendChild(btn);
+    }
+  } catch (e) {
+    msg.innerHTML = `<div class="msg err">${e.message || e}</div>`;
+  } finally {
+    $('run').disabled = false;
+    w.style.display = 'none';
+    if (handle) closeVideo(handle);
+  }
+};
+
+// ---------- 生成方案 ----------
+$('gen').onclick = () => {
+  const p = {
+    weightKg: val('weightKg'), squat1RMKg: val('squat1RMKg'),
+    standingReachCm: val('standingReachCm'), cmjCm: val('cmjCm'), sjCm: val('sjCm'),
+    approachReachCm: val('approachReachCm'),
+    tripleHopLCm: val('tripleHopLCm'), tripleHopRCm: val('tripleHopRCm'),
+    standingTripleJumpCm: val('standingTripleJumpCm'),
+    rsi: val('rsi'), proAgilityS: val('proAgilityS'), t505S: val('t505S'),
+    painNrs: val('painNrs'), run12minM: val('run12minM'), restingHr: val('restingHr'),
+  };
+  const t = val('run3000');
+  if (t) {
+    const m = t.match(/^(\d+)\s*[:：'′]\s*(\d{1,2})?$/) || t.match(/^(\d+)$/);
+    if (m) p.run3000S = Number(m[1]) * 60 + (m[2] ? Number(m[2]) : 0);
+  }
+
+  const { d, notes, warnings } = computeDerived(p);
+  const flags = buildFlags(d, 320);
+  for (const w of warnings) flags.unshift({ level: 'AMBER', text: '数据口径可疑 —— ' + w });
+
+  const heightCm = Number(val('heightCm'));
+  if (!d.cmjCm && heightCm) {
+    flags.push({ level: 'INFO', text: `身高 ${heightCm} cm 已记录；站立摸高与助跑摸高才是缺口计算的依据。` });
+  }
+
+  const limiters = rankLimiters(d);
+  const plan = prescribe(d, 'dunk');
+  let md = renderMarkdown(d, flags, limiters, plan, {});
+  if (notes.length) {
+    md = md.replace('## 2. 判读与标记',
+      '**数据说明**\n\n' + notes.map(n => '- ' + n).join('\n') + '\n\n## 2. 判读与标记');
+  }
+
+  const lines = md.split('\n');
+  const html = lines.map(l => {
+    if (l.startsWith('# ')) return `<h2>${l.slice(2)}</h2>`;
+    if (l.startsWith('## ')) return `<h3 style="font-size:14px;color:var(--acc);margin:18px 0 8px">${l.slice(3)}</h3>`;
+    if (l.startsWith('- ')) {
+      const cls = l.includes('🔴') ? 'err' : (l.includes('🟠') ? '' : '');
+      return `<div style="font-size:14px;margin:5px 0">${l.slice(2)}</div>`;
+    }
+    if (l.startsWith('| ')) return `<div style="font-family:ui-monospace,monospace;font-size:12px">${l}</div>`;
+    if (l.startsWith('> ')) return `<div class="hint">${l.slice(2)}</div>`;
+    if (l.trim() === '---') return '<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">';
+    return l ? `<div style="font-size:14px;margin:5px 0">${l}</div>` : '';
+  }).join('');
+
+  $('out').innerHTML = `<div class="card">${html}</div>`;
+  $('copy').style.display = 'block';
+  $('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(md); $('copy').textContent = '已复制 ✓'; }
+    catch { $('copy').textContent = '复制失败，请长按选择'; }
+  };
+  window.scrollTo({ top: $('out').offsetTop - 20, behavior: 'smooth' });
+};
+</script>
+
+<script>
+// 只在 http(s) 下注册：file:// 打开单文件时没有 SW，也不该报错
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW 注册失败', e));
+  });
+}
+</script>
+</body>
+</html>
